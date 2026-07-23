@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantFolio - Gestão & Rebalanceamento de Carteira</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        darkbg: '#0b0f17',
+                        cardbg: '#111827',
+                        cardborder: '#1f2937'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0f17;
+            color: #f3f4f6;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        .toast-enter {
+            transform: translateY(-20px);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        .toast-show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between pb-16 md:pb-0">
+
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="fixed top-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <!-- Header Navbar -->
+    <header class="bg-cardbg/80 backdrop-blur-md border-b border-cardborder sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="bg-gradient-to-tr from-emerald-500 to-teal-400 p-2.5 rounded-xl shadow-lg shadow-emerald-500/20">
+                        <i class="fa-solid fa-chart-pie text-slate-950 text-xl font-bold"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <h1 class="text-lg font-bold text-white tracking-wide">Quant<span class="text-emerald-400">Folio</span></h1>
+                            <span id="cloudStatusBadge" class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full border border-gray-700 font-medium flex items-center gap-1">
+                                <i class="fa-solid fa-hard-drive text-amber-400"></i> Local
+                            </span>
+                        </div>
+                        <p class="text-xs text-gray-400 hidden sm:block">Análise Quantitativa & Rebalanceamento</p>
+                    </div>
+                </div>
+
+                <!-- Profile Selector & Quick Actions -->
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <button onclick="openCloudModal()" class="bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs sm:text-sm font-medium px-3 py-2 rounded-xl transition flex items-center space-x-1.5">
+                        <i class="fa-solid fa-cloud text-indigo-400"></i>
+                        <span class="hidden sm:inline">Compartilhar / Nuvem</span>
+                    </button>
+
+                    <div class="flex items-center bg-gray-800/80 rounded-xl p-1 border border-gray-700/60">
+                        <span class="text-xs text-gray-400 px-2 font-medium hidden md:inline">Perfil:</span>
+                        <select id="profileSelect" onchange="changeProfile(this.value)" class="bg-transparent text-xs sm:text-sm font-semibold text-emerald-400 focus:outline-none cursor-pointer pr-1">
+                            <option value="conservador" class="bg-gray-900 text-white">Conservador</option>
+                            <option value="moderado" class="bg-gray-900 text-white" selected>Moderado</option>
+                            <option value="arrojado" class="bg-gray-900 text-white">Arrojado</option>
+                            <option value="custom" class="bg-gray-900 text-white">Personalizado</option>
+                        </select>
+                    </div>
+
+                    <button onclick="openModal('assetModal')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-medium px-3 py-2 rounded-xl transition-all shadow-md shadow-emerald-900/30 flex items-center space-x-1.5">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span class="hidden sm:inline">Novo Ativo</span>
+                    </button>
+                    
+                    <button onclick="exportImportData()" title="Backup de Dados" class="bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded-xl border border-gray-700 transition">
+                        <i class="fa-solid fa-database text-xs sm:text-sm"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-grow w-full">
+        
+        <!-- Navigation Tabs (Desktop & Tablet) -->
+        <div class="flex border-b border-gray-800 mb-6 space-x-6 text-sm font-medium overflow-x-auto">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-btn pb-3 text-emerald-400 border-b-2 border-emerald-400 flex items-center space-x-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-gauge-high"></i>
+                <span>Visão Geral</span>
+            </button>
+            <button onclick="switchTab('assets')" id="tab-assets" class="tab-btn pb-3 text-gray-400 hover:text-gray-200 border-b-2 border-transparent flex items-center space-x-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-list-check"></i>
+                <span>Meus Ativos</span>
+            </button>
+            <button onclick="switchTab('rebalance')" id="tab-rebalance" class="tab-btn pb-3 text-gray-400 hover:text-gray-200 border-b-2 border-transparent flex items-center space-x-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Rebalanceamento</span>
+            </button>
+            <button onclick="switchTab('aporte')" id="tab-aporte" class="tab-btn pb-3 text-gray-400 hover:text-gray-200 border-b-2 border-transparent flex items-center space-x-2 transition whitespace-nowrap">
+                <i class="fa-solid fa-calculator"></i>
+                <span>Simulador de Aportes</span>
+            </button>
+        </div>
+
+        <!-- Top Metrics Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-cardbg border border-cardborder p-4 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between text-gray-400 text-xs mb-1">
+                    <span>Patrimônio Total</span>
+                    <i class="fa-solid fa-wallet text-emerald-400"></i>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold text-white tracking-tight" id="kpiTotalValue">R$ 0,00</div>
+                <div class="text-xs text-gray-500 mt-1" id="kpiInvested">Investido: R$ 0,00</div>
+            </div>
+
+            <div class="bg-cardbg border border-cardborder p-4 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between text-gray-400 text-xs mb-1">
+                    <span>Lucro / Prejuízo</span>
+                    <i class="fa-solid fa-chart-line text-blue-400"></i>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold tracking-tight" id="kpiProfit">R$ 0,00</div>
+                <div class="text-xs font-semibold mt-1" id="kpiProfitPercent">0.00%</div>
+            </div>
+
+            <div class="bg-cardbg border border-cardborder p-4 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between text-gray-400 text-xs mb-1">
+                    <span>Total de Ativos</span>
+                    <i class="fa-solid fa-cubes text-purple-400"></i>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold text-white tracking-tight" id="kpiAssetCount">0</div>
+                <div class="text-xs text-gray-500 mt-1" id="kpiCategoryCount">0 categorias</div>
+            </div>
+
+            <div class="bg-cardbg border border-cardborder p-4 rounded-2xl shadow-sm">
+                <div class="flex items-center justify-between text-gray-400 text-xs mb-1">
+                    <span>Desvio da Meta (Drift)</span>
+                    <i class="fa-solid fa-arrows-split-up-and-left text-amber-400"></i>
+                </div>
+                <div class="text-lg sm:text-2xl font-bold text-white tracking-tight" id="kpiDrift">0.0%</div>
+                <div class="text-xs text-amber-400 mt-1" id="kpiDriftStatus">Carteira Equilibrada</div>
+            </div>
+        </div>
+
+        
+        <!-- TAB 1: DASHBOARD VIEW -->
+        <div id="view-dashboard" class="tab-view space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Allocation Chart by Category -->
+                <div class="bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm flex flex-col justify-between">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-gray-200">Alocação Atual por Categoria</h3>
+                        <span class="text-xs text-gray-500">Real vs Ideal</span>
+                    </div>
+                    <div class="relative h-64 w-full flex items-center justify-center">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Target vs Actual Comparison -->
+                <div class="bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm flex flex-col">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-gray-200">Distribuição por Perfil (<span id="profileTitleLabel">Moderado</span>)</h3>
+                        <button onclick="switchTab('rebalance')" class="text-xs text-emerald-400 hover:underline">Ver Detalhes</button>
+                    </div>
+                    <div id="categoryProgressList" class="space-y-4 overflow-y-auto max-h-64 pr-1">
+                        <!-- Dynamic list of category target vs actual progress bars -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Performing & Priority Rebalance Assets Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Top Opportunities (Comprar) -->
+                <div class="bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm">
+                    <h3 class="text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                        <i class="fa-solid fa-circle-arrow-up text-emerald-400"></i>
+                        <span>Oportunidades de Aporte (Mais Distantes da Meta)</span>
+                    </h3>
+                    <div id="topBuyOpportunities" class="space-y-3">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Overweight Assets (Aguardar / Reduzir) -->
+                <div class="bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm">
+                    <h3 class="text-sm font-semibold text-gray-200 mb-3 flex items-center space-x-2">
+                        <i class="fa-solid fa-scale-balanced text-amber-400"></i>
+                        <span>Ativos Acima da Meta</span>
+                    </h3>
+                    <div id="overweightAssets" class="space-y-3">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: ASSETS MANAGEMENT VIEW -->
+        <div id="view-assets" class="tab-view hidden space-y-4">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-cardbg p-4 border border-cardborder rounded-2xl">
+                <!-- Search & Filters -->
+                <div class="flex flex-1 items-center space-x-3 w-full sm:w-auto">
+                    <div class="relative w-full sm:w-64">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-gray-500 text-xs"></i>
+                        <input type="text" id="assetSearchInput" oninput="filterAssetsTable()" placeholder="Buscar código ou nome..." class="w-full bg-gray-900 border border-gray-700 text-xs rounded-xl pl-8 pr-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <select id="categoryFilter" onchange="filterAssetsTable()" class="bg-gray-900 border border-gray-700 text-xs text-gray-300 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500">
+                        <option value="ALL">Todas Categorias</option>
+                        <option value="Ações BR">Ações BR</option>
+                        <option value="FIIs">FIIs</option>
+                        <option value="Renda Fixa">Renda Fixa</option>
+                        <option value="Internacional">Internacional</option>
+                        <option value="Cripto">Cripto</option>
+                        <option value="Outros">Outros</option>
+                    </select>
+                </div>
+                <div class="text-xs text-gray-400">
+                    Total cadastrado: <span id="assetFilteredCount" class="font-bold text-white">0</span>
+                </div>
+            </div>
+
+            <!-- Assets Table -->
+            <div class="bg-cardbg border border-cardborder rounded-2xl overflow-hidden shadow-sm">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-gray-900/80 text-gray-400 uppercase tracking-wider border-b border-cardborder">
+                            <tr>
+                                <th class="py-3.5 px-4">Ativo</th>
+                                <th class="py-3.5 px-4">Categoria</th>
+                                <th class="py-3.5 px-4 text-right">Qtd</th>
+                                <th class="py-3.5 px-4 text-right">Preço Médio</th>
+                                <th class="py-3.5 px-4 text-right">Preço Atual</th>
+                                <th class="py-3.5 px-4 text-right">Total Atual</th>
+                                <th class="py-3.5 px-4 text-right">Resultado</th>
+                                <th class="py-3.5 px-4 text-center">Peso Atual</th>
+                                <th class="py-3.5 px-4 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="assetsTableBody" class="divide-y divide-gray-800/60 text-gray-200">
+                            <!-- JS Populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: REBALANCE DETAILED VIEW -->
+        <div id="view-rebalance" class="tab-view hidden space-y-6">
+            <div class="bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                    <div>
+                        <h3 class="text-base font-bold text-white">Análise de Rebalanceamento por Ativo</h3>
+                        <p class="text-xs text-gray-400">Comparativo de quanto você tem vs. quanto deveria ter conforme suas metas.</p>
+                    </div>
+                    <div class="flex items-center space-x-2 text-xs">
+                        <span class="inline-flex items-center px-2 py-1 rounded-md bg-emerald-950 text-emerald-400 border border-emerald-800/50">
+                            <i class="fa-solid fa-circle text-[8px] mr-1.5"></i> Comprar (Abaixo)
+                        </span>
+                        <span class="inline-flex items-center px-2 py-1 rounded-md bg-amber-950 text-amber-400 border border-amber-800/50">
+                            <i class="fa-solid fa-circle text-[8px] mr-1.5"></i> Manter / Acima
+                        </span>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-gray-900/80 text-gray-400 uppercase tracking-wider border-b border-cardborder">
+                            <tr>
+                                <th class="py-3 px-4">Ativo</th>
+                                <th class="py-3 px-4 text-right">Posição Atual</th>
+                                <th class="py-3 px-4 text-center">% Actual</th>
+                                <th class="py-3 px-4 text-center">% Meta Individual</th>
+                                <th class="py-3 px-4 text-right">Valor Ideal</th>
+                                <th class="py-3 px-4 text-right">Diferença (R$)</th>
+                                <th class="py-3 px-4 text-center">Recomendação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rebalanceTableBody" class="divide-y divide-gray-800/60 text-gray-200">
+                            <!-- JS Populated -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: SMART APORTE SIMULATOR -->
+        <div id="view-aporte" class="tab-view hidden space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Input Panel -->
+                <div class="bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm space-y-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-hand-holding-dollar text-emerald-400"></i>
+                        <span>Simulador de Aporte</span>
+                    </h3>
+                    <p class="text-xs text-gray-400 leading-relaxed">
+                        Informe quanto dinheiro você quer investir hoje. Nosso algoritmo vai distribuir este valor priorizando os ativos que estão mais atrás da sua meta ideal, **evitando vendas desnecessárias**.
+                    </p>
+
+                    <div>
+                        <label class="block text-xs text-gray-300 font-medium mb-1.5">Valor do Novo Aporte (R$)</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-gray-500 font-semibold text-xs">R$</span>
+                            <input type="number" id="aporteValueInput" value="1000" step="100" min="1" class="w-full bg-gray-900 border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold text-emerald-400 focus:outline-none focus:border-emerald-500">
+                        </div>
+                    </div>
+
+                    <button onclick="calculateSmartAporte()" class="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold text-xs py-3 rounded-xl transition shadow-lg shadow-emerald-900/30 flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Calcular Distribuição Ideal</span>
+                    </button>
+                </div>
+
+                <!-- Simulation Results -->
+                <div class="lg:col-span-2 bg-cardbg border border-cardborder p-5 rounded-2xl shadow-sm">
+                    <h3 class="text-sm font-semibold text-gray-200 mb-3">Sugestão de Compra para o Aporte</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-gray-900/80 text-gray-400 uppercase tracking-wider border-b border-cardborder">
+                                <tr>
+                                    <th class="py-3 px-3">Ativo</th>
+                                    <th class="py-3 px-3 text-right">Preço Atual</th>
+                                    <th class="py-3 px-3 text-right">Valor Sugerido</th>
+                                    <th class="py-3 px-3 text-center">Qtd a Comprar</th>
+                                    <th class="py-3 px-3 text-center">Nova % Após Aporte</th>
+                                </tr>
+                            </thead>
+                            <tbody id="aporteResultsTable" class="divide-y divide-gray-800/60">
+                                <tr>
+                                    <td colspan="5" class="py-8 text-center text-gray-500">Clique em "Calcular Distribuição Ideal" para gerar as sugestões.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-cardbg/95 backdrop-blur-lg border-t border-cardborder z-40 px-3 py-2 flex justify-around text-center">
+        <button onclick="switchTab('dashboard')" id="mob-tab-dashboard" class="flex flex-col items-center text-emerald-400 space-y-1">
+            <i class="fa-solid fa-gauge-high text-base"></i>
+            <span class="text-[10px]">Início</span>
+        </button>
+        <button onclick="switchTab('assets')" id="mob-tab-assets" class="flex flex-col items-center text-gray-400 space-y-1">
+            <i class="fa-solid fa-list-check text-base"></i>
+            <span class="text-[10px]">Ativos</span>
+        </button>
+        <button onclick="switchTab('rebalance')" id="mob-tab-rebalance" class="flex flex-col items-center text-gray-400 space-y-1">
+            <i class="fa-solid fa-sliders text-base"></i>
+            <span class="text-[10px]">Rebalancear</span>
+        </button>
+        <button onclick="switchTab('aporte')" id="mob-tab-aporte" class="flex flex-col items-center text-gray-400 space-y-1">
+            <i class="fa-solid fa-calculator text-base"></i>
+            <span class="text-[10px]">Aporte</span>
+        </button>
+    </nav>
+
+    <!-- Modal: Cloud Sync / Share Portfolio -->
+    <div id="cloudModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-cardbg border border-cardborder w-full max-w-md rounded-2xl p-6 shadow-2xl relative space-y-4">
+            <button onclick="closeModal('cloudModal')" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <div class="flex items-center space-x-3">
+                <div class="p-3 bg-indigo-500/20 text-indigo-400 rounded-xl border border-indigo-500/30">
+                    <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="text-base font-bold text-white">Sincronização & Compartilhamento</h3>
+                    <p class="text-xs text-gray-400">Acesse no celular, notebook ou compartilhe com outra pessoa.</p>
+                </div>
+            </div>
+
+            <!-- Active Cloud State -->
+            <div id="cloudStatusCard" class="bg-gray-900 border border-gray-800 p-3.5 rounded-xl text-xs space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-gray-400">Modo de Operação:</span>
+                    <span id="modalModeLabel" class="font-bold text-amber-400">Modo Off-line / Local</span>
+                </div>
+                <div id="modalCodeContainer" class="hidden flex items-center justify-between bg-black/50 p-2 rounded-lg border border-gray-800">
+                    <span class="text-gray-400">Código da Carteira:</span>
+                    <span id="currentCloudCode" class="font-mono font-bold text-indigo-400 text-sm">--</span>
+                </div>
+            </div>
+
+            <!-- Share / Join Controls -->
+            <div class="space-y-3 pt-1">
+                <div>
+                    <label class="block text-xs text-gray-300 font-medium mb-1">Entrar em uma Carteira Existente ou Criar Código:</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="cloudRoomInput" placeholder="Ex: FAMILIA-SILVA ou CARTEIRA-123" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-xs text-white uppercase focus:outline-none focus:border-indigo-500">
+                        <button onclick="connectToCloudRoom()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs px-4 rounded-xl transition whitespace-nowrap">
+                            Conectar
+                        </button>
+                    </div>
+                    <span class="text-[10px] text-gray-500 mt-1 block">Qualquer pessoa com este mesmo código poderá visualizar e editar a carteira em tempo real.</span>
+                </div>
+
+                <div class="flex space-x-2">
+                    <button onclick="generateRandomRoom()" class="w-1/2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs py-2.5 rounded-xl transition border border-gray-700 flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-dice"></i>
+                        <span>Gerar Código</span>
+                    </button>
+                    <button onclick="copyCloudCode()" id="btnCopyCloudCode" class="w-1/2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs py-2.5 rounded-xl transition border border-gray-700 flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-copy"></i>
+                        <span>Copiar Código</span>
+                    </button>
+                </div>
+
+                <hr class="border-gray-800">
+
+                <button onclick="switchToLocalMode()" class="w-full bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs py-2 rounded-xl border border-rose-800/40 transition">
+                    Desconectar da Nuvem (Voltar ao Modo Local)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Asset -->
+    <div id="assetModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-cardbg border border-cardborder w-full max-w-md rounded-2xl p-6 shadow-2xl relative">
+            <button onclick="closeModal('assetModal')" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <h3 id="modalTitle" class="text-base font-bold text-white mb-4">Adicionar Novo Ativo</h3>
+
+            <form id="assetForm" onsubmit="handleAssetSubmit(event)" class="space-y-3 text-xs">
+                <input type="hidden" id="assetId">
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Código / Ticker (ex: PETR4, HGLG11, CDB Selic)</label>
+                    <input type="text" id="formTicker" required placeholder="PETR4" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white uppercase focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Nome Completo / Descrição</label>
+                    <input type="text" id="formName" required placeholder="Petrobras PN" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-gray-300 mb-1">Categoria</label>
+                        <select id="formCategory" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                            <option value="Ações BR">Ações BR</option>
+                            <option value="FIIs">FIIs</option>
+                            <option value="Renda Fixa">Renda Fixa</option>
+                            <option value="Internacional">Internacional</option>
+                            <option value="Cripto">Cripto</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 mb-1">Quantidade</label>
+                        <input type="number" step="any" id="formQuantity" required placeholder="100" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-gray-300 mb-1">Preço Médio (R$)</label>
+                        <input type="number" step="any" id="formAvgPrice" required placeholder="32.50" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-gray-300 mb-1">Preço Atual (R$)</label>
+                        <input type="number" step="any" id="formCurrentPrice" required placeholder="35.10" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-gray-300 mb-1">Meta Desejada no Ativo (% do Total)</label>
+                    <input type="number" step="0.1" id="formTargetPercent" required placeholder="10.0" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+                    <span class="text-[10px] text-gray-500">Define o peso alvo deste ativo dentro de sua estratégia.</span>
+                </div>
+
+                <div class="pt-3 flex space-x-2">
+                    <button type="button" onclick="closeModal('assetModal')" class="w-1/2 bg-gray-800 hover:bg-gray-700 text-gray-300 py-2.5 rounded-xl transition">Cancelar</button>
+                    <button type="submit" class="w-1/2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl transition shadow-md shadow-emerald-900/30">Salvar Ativo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Data Backup Export / Import -->
+    <div id="dataModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-cardbg border border-cardborder w-full max-w-md rounded-2xl p-6 shadow-2xl relative space-y-4">
+            <button onclick="closeModal('dataModal')" class="absolute top-4 right-4 text-gray-400 hover:text-white">
+                <i class="fa-solid fa-xmark text-lg"></i>
+            </button>
+
+            <h3 class="text-base font-bold text-white">Backup e Restauração de Dados</h3>
+            <p class="text-xs text-gray-400">Seus dados ficam armazenados localmente no seu navegador ou sincronizados na nuvem. Você pode baixar um arquivo JSON de segurança ou restaurar dados antigos.</p>
+
+            <div class="space-y-2">
+                <button onclick="downloadBackup()" class="w-full bg-gray-800 hover:bg-gray-700 text-white text-xs py-2.5 rounded-xl border border-gray-700 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-download"></i>
+                    <span>Exportar Backup (JSON)</span>
+                </button>
+            </div>
+
+            <hr class="border-gray-800">
+
+            <div class="space-y-2">
+                <label class="block text-xs text-gray-300 font-medium">Restaurar de arquivo JSON:</label>
+                <input type="file" id="importFileInput" accept=".json" class="text-xs text-gray-400 w-full file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-gray-800 file:text-emerald-400 hover:file:bg-gray-700 cursor-pointer">
+                <button onclick="uploadBackup()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-2.5 rounded-xl transition">Importar Dados</button>
+            </div>
+
+            <hr class="border-gray-800">
+
+            <button onclick="resetToDefaultData()" class="w-full bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-xs py-2 rounded-xl border border-rose-800/40">
+                Restaurar Dados Demonstrativos Exemplo
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase Cloud Initialization Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Environment variables
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'quantfolio-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "demo-key",
+            authDomain: "demo-project.firebaseapp.com",
+            projectId: "demo-project"
+        };
+
+        let app, db, auth;
+        let unsubscribeDoc = null;
+        let currentUser = null;
+
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            // Authenticate first
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                signInWithCustomToken(auth, __initial_auth_token).then(res => {
+                    currentUser = res.user;
+                    initCloudListener();
+                }).catch(() => {
+                    signInAnonymously(auth).then(res => {
+                        currentUser = res.user;
+                        initCloudListener();
+                    });
+                });
+            } else {
+                signInAnonymously(auth).then(res => {
+                    currentUser = res.user;
+                    initCloudListener();
+                }).catch(err => {
+                    console.warn("Nuvem rodando em modo offline/demo:", err);
+                });
+            }
+        } catch(e) {
+            console.warn("Firebase não pôde ser inicializado completamente:", e);
+        }
+
+        // Global functions exposed for cloud sync
+        window.cloudSync = {
+            activeRoom: null,
+            
+            saveToCloud: async function(stateData) {
+                if (!this.activeRoom || !db || !currentUser) return;
+                try {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'portfolios', this.activeRoom);
+                    await setDoc(docRef, {
+                        profile: stateData.profile,
+                        assets: stateData.assets,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                } catch(err) {
+                    console.error("Erro ao salvar na nuvem:", err);
+                    window.showToast("Erro de sincronização na nuvem", "error");
+                }
+            },
+
+            connectRoom: function(roomCode) {
+                if (!roomCode) return;
+                const formattedCode = roomCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+                if (!formattedCode) return;
+
+                this.activeRoom = formattedCode;
+                window.state.cloudRoom = formattedCode;
+                window.saveStateLocal();
+
+                initCloudListener();
+                window.updateCloudStatusUI();
+                window.showToast(`Conectado à nuvem: ${formattedCode}`, "success");
+            },
+
+            disconnectRoom: function() {
+                if (unsubscribeDoc) {
+                    unsubscribeDoc();
+                    unsubscribeDoc = null;
+                }
+                this.activeRoom = null;
+                window.state.cloudRoom = null;
+                window.saveStateLocal();
+                window.updateCloudStatusUI();
+                window.showToast("Desconectado da nuvem. Operando em modo local.", "info");
+            }
+        };
+
+        function initCloudListener() {
+            const savedRoom = window.state?.cloudRoom;
+            if (!savedRoom || !db || !currentUser) return;
+
+            window.cloudSync.activeRoom = savedRoom;
+
+            if (unsubscribeDoc) unsubscribeDoc();
+
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'portfolios', savedRoom);
+
+            unsubscribeDoc = onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.assets) {
+                        window.state.profile = data.profile || window.state.profile;
+                        window.state.assets = data.assets || [];
+                        window.saveStateLocal(false); // Don't re-push to cloud on snapshot receive
+                        window.renderAll();
+                        window.showToast("Carteira atualizada em tempo real!", "info");
+                    }
+                } else {
+                    // Document doesn't exist yet, push current local state to cloud
+                    window.cloudSync.saveToCloud(window.state);
+                }
+            }, (error) => {
+                console.error("Erro no listener Firestore:", error);
+            });
+
+            window.updateCloudStatusUI();
+        }
+
+        window.initCloudListener = initCloudListener;
+    </script>
+
+    <!-- Main Logic Script -->
+    <script>
+        // State Management
+        const STORAGE_KEY = 'quantfolio_data_v2';
+        
+        // Profiles preset categories allocation targets (%)
+        const PROFILES = {
+            conservador: { name: 'Conservador', 'Renda Fixa': 70, 'FIIs': 15, 'Ações BR': 10, 'Internacional': 5, 'Cripto': 0, 'Outros': 0 },
+            moderado: { name: 'Moderado', 'Renda Fixa': 35, 'Ações BR': 25, 'FIIs': 20, 'Internacional': 15, 'Cripto': 5, 'Outros': 0 },
+            arrojado: { name: 'Arrojado', 'Ações BR': 35, 'Internacional': 25, 'FIIs': 20, 'Renda Fixa': 10, 'Cripto': 10, 'Outros': 0 },
+            custom: { name: 'Personalizado', 'Renda Fixa': 20, 'Ações BR': 20, 'FIIs': 20, 'Internacional': 20, 'Cripto': 10, 'Outros': 10 }
+        };
+
+        // Default Initial Data (Financial Portfolio Demo)
+        const INITIAL_ASSETS = [
+            { id: '1', ticker: 'PETR4', name: 'Petrobras PN', category: 'Ações BR', quantity: 200, avgPrice: 28.50, currentPrice: 36.20, targetPercent: 15 },
+            { id: '2', ticker: 'VALE3', name: 'Vale ON', category: 'Ações BR', quantity: 100, avgPrice: 68.00, currentPrice: 61.50, targetPercent: 10 },
+            { id: '3', ticker: 'HGLG11', name: 'CSHG Logística', category: 'FIIs', quantity: 50, avgPrice: 155.00, currentPrice: 162.30, targetPercent: 15 },
+            { id: '4', ticker: 'XPIN11', name: 'XP Industrial', category: 'FIIs', quantity: 80, avgPrice: 82.00, currentPrice: 78.90, targetPercent: 10 },
+            { id: '5', ticker: 'TESOURO SELIC', name: 'Tesouro Selic 2029', category: 'Renda Fixa', quantity: 10, avgPrice: 1400.00, currentPrice: 1460.00, targetPercent: 30 },
+            { id: '6', ticker: 'IVVB11', name: 'iShares S&P 500', category: 'Internacional', quantity: 40, avgPrice: 260.00, currentPrice: 310.00, targetPercent: 15 },
+            { id: '7', ticker: 'BTC', name: 'Bitcoin', category: 'Cripto', quantity: 0.02, avgPrice: 280000.00, currentPrice: 340000.00, targetPercent: 5 }
+        ];
+
+        window.state = {
+            profile: 'moderado',
+            assets: [],
+            cloudRoom: null
+        };
+
+        let chartInstance = null;
+
+        window.onload = function() {
+            loadState();
+            renderAll();
+            updateCloudStatusUI();
+        };
+
+        function loadState() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                try {
+                    window.state = JSON.parse(saved);
+                } catch(e) {
+                    window.state = { profile: 'moderado', assets: INITIAL_ASSETS, cloudRoom: null };
+                }
+            } else {
+                window.state = { profile: 'moderado', assets: INITIAL_ASSETS, cloudRoom: null };
+                saveState();
+            }
+            document.getElementById('profileSelect').value = window.state.profile || 'moderado';
+        }
+
+        function saveState(pushToCloud = true) {
+            saveStateLocal(pushToCloud);
+        }
+
+        function saveStateLocal(pushToCloud = true) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(window.state));
+            if (pushToCloud && window.cloudSync && window.cloudSync.activeRoom) {
+                window.cloudSync.saveToCloud(window.state);
+            }
+        }
+
+        function changeProfile(newProfile) {
+            window.state.profile = newProfile;
+            saveState();
+            renderAll();
+        }
+
+        // Calculation Helpers
+        function computePortfolioMetrics() {
+            let totalValue = 0;
+            let totalInvested = 0;
+            const categoryTotals = {};
+
+            window.state.assets.forEach(asset => {
+                const currentVal = asset.quantity * asset.currentPrice;
+                const investedVal = asset.quantity * asset.avgPrice;
+
+                totalValue += currentVal;
+                totalInvested += investedVal;
+
+                if (!categoryTotals[asset.category]) {
+                    categoryTotals[asset.category] = 0;
+                }
+                categoryTotals[asset.category] += currentVal;
+            });
+
+            const totalProfit = totalValue - totalInvested;
+            const profitPercent = totalInvested > 0 ? (totalProfit / totalInvested) * 100 : 0;
+
+            // Calculate Portfolio Drift (desvio geral da meta em %)
+            let driftSum = 0;
+            window.state.assets.forEach(asset => {
+                const actualWeight = totalValue > 0 ? ((asset.quantity * asset.currentPrice) / totalValue) * 100 : 0;
+                driftSum += Math.abs(actualWeight - asset.targetPercent);
+            });
+
+            return {
+                totalValue,
+                totalInvested,
+                totalProfit,
+                profitPercent,
+                categoryTotals,
+                driftScore: driftSum
+            };
+        }
+
+        function renderAll() {
+            const metrics = computePortfolioMetrics();
+
+            // Render KPIs
+            document.getElementById('kpiTotalValue').textContent = formatBRL(metrics.totalValue);
+            document.getElementById('kpiInvested').textContent = `Investido: ${formatBRL(metrics.totalInvested)}`;
+            
+            const profitEl = document.getElementById('kpiProfit');
+            profitEl.textContent = `${metrics.totalProfit >= 0 ? '+' : ''}${formatBRL(metrics.totalProfit)}`;
+            profitEl.className = `text-lg sm:text-2xl font-bold tracking-tight ${metrics.totalProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            const profitPctEl = document.getElementById('kpiProfitPercent');
+            profitPctEl.textContent = `${metrics.profitPercent >= 0 ? '+' : ''}${metrics.profitPercent.toFixed(2)}% de retorno`;
+            profitPctEl.className = `text-xs font-semibold mt-1 ${metrics.profitPercent >= 0 ? 'text-emerald-400' : 'text-rose-400'}`;
+
+            document.getElementById('kpiAssetCount').textContent = window.state.assets.length;
+            const uniqueCats = new Set(window.state.assets.map(a => a.category)).size;
+            document.getElementById('kpiCategoryCount').textContent = `${uniqueCats} categorias ativas`;
+
+            document.getElementById('kpiDrift').textContent = `${metrics.driftScore.toFixed(1)}%`;
+            const driftStatusEl = document.getElementById('kpiDriftStatus');
+            if (metrics.driftScore < 10) {
+                driftStatusEl.textContent = "Carteira Equilibrada";
+                driftStatusEl.className = "text-xs text-emerald-400 mt-1";
+            } else if (metrics.driftScore < 25) {
+                driftStatusEl.textContent = "Desvio Moderado";
+                driftStatusEl.className = "text-xs text-amber-400 mt-1";
+            } else {
+                driftStatusEl.textContent = "Necessita Rebalanceamento";
+                driftStatusEl.className = "text-xs text-rose-400 mt-1";
+            }
+
+            const profileObj = PROFILES[window.state.profile] || PROFILES.moderado;
+            document.getElementById('profileTitleLabel').textContent = profileObj.name;
+
+            // Render Sub-Views
+            renderCategoryChart(metrics);
+            renderCategoryProgressBars(metrics);
+            renderTopOpportunities(metrics);
+            renderAssetsTable();
+            renderRebalanceTable(metrics);
+        }
+
+        // Chart Rendering
+        function renderCategoryChart(metrics) {
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            
+            const categories = ['Ações BR', 'FIIs', 'Renda Fixa', 'Internacional', 'Cripto', 'Outros'];
+            const dataValues = categories.map(cat => metrics.categoryTotals[cat] || 0);
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        data: dataValues,
+                        backgroundColor: [
+                            '#22c55e', // Emerald
+                            '#3b82f6', // Blue
+                            '#eab308', // Yellow/Amber
+                            '#a855f7', // Purple
+                            '#f97316', // Orange
+                            '#64748b'  // Slate
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#111827'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#9ca3af',
+                                font: { size: 11, family: 'Inter' },
+                                padding: 12
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const val = context.raw || 0;
+                                    const pct = metrics.totalValue > 0 ? ((val / metrics.totalValue) * 100).toFixed(1) : 0;
+                                    return ` ${context.label}: R$ ${val.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (${pct}%)`;
+                                }
+                            }
+                        }
+                    },
+                    cutout: '70%'
+                }
+            });
+        }
+
+        // Category Target Progress Bars
+        function renderCategoryProgressBars(metrics) {
+            const container = document.getElementById('categoryProgressList');
+            container.innerHTML = '';
+
+            const profileTargets = PROFILES[window.state.profile] || PROFILES.moderado;
+            const categories = ['Ações BR', 'FIIs', 'Renda Fixa', 'Internacional', 'Cripto', 'Outros'];
+
+            categories.forEach(cat => {
+                const targetPct = profileTargets[cat] || 0;
+                const actualVal = metrics.categoryTotals[cat] || 0;
+                const actualPct = metrics.totalValue > 0 ? (actualVal / metrics.totalValue) * 100 : 0;
+
+                if (targetPct === 0 && actualPct === 0) return;
+
+                const div = document.createElement('div');
+                div.className = "space-y-1";
+                div.innerHTML = `
+                    <div class="flex justify-between text-xs">
+                        <span class="font-medium text-gray-300">${cat}</span>
+                        <span class="text-gray-400">Atual: <strong class="text-white">${actualPct.toFixed(1)}%</strong> / Meta: <strong class="text-emerald-400">${targetPct}%</strong></span>
+                    </div>
+                    <div class="w-full bg-gray-800 rounded-full h-2 overflow-hidden flex">
+                        <div class="bg-emerald-500 h-2 transition-all duration-500" style="width: ${Math.min(actualPct, 100)}%"></div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderTopOpportunities(metrics) {
+            const buyContainer = document.getElementById('topBuyOpportunities');
+            const overContainer = document.getElementById('overweightAssets');
+
+            buyContainer.innerHTML = '';
+            overContainer.innerHTML = '';
+
+            const analyzed = window.state.assets.map(asset => {
+                const actualVal = asset.quantity * asset.currentPrice;
+                const actualPct = metrics.totalValue > 0 ? (actualVal / metrics.totalValue) * 100 : 0;
+                const targetVal = metrics.totalValue * (asset.targetPercent / 100);
+                const diffVal = targetVal - actualVal; // Positive = Underweight (Comprar)
+                const diffPct = asset.targetPercent - actualPct;
+
+                return { ...asset, actualVal, actualPct, targetVal, diffVal, diffPct };
+            });
+
+            // Underweight (Buy)
+            const buyList = [...analyzed].filter(a => a.diffVal > 10).sort((a, b) => b.diffPct - a.diffPct).slice(0, 3);
+            if (buyList.length === 0) {
+                buyContainer.innerHTML = `<p class="text-xs text-gray-500 py-2">Todos os ativos estão próximos das metas!</p>`;
+            } else {
+                buyList.forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = "flex items-center justify-between p-2.5 bg-gray-900/60 rounded-xl border border-gray-800 text-xs";
+                    itemEl.innerHTML = `
+                        <div class="flex items-center space-x-2.5">
+                            <span class="font-bold text-emerald-400 w-14">${item.ticker}</span>
+                            <span class="text-gray-400">${item.category}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-emerald-400 font-semibold">+ ${formatBRL(item.diffVal)}</span>
+                            <div class="text-[10px] text-gray-500">Atual: ${item.actualPct.toFixed(1)}% | Meta: ${item.targetPercent}%</div>
+                        </div>
+                    `;
+                    buyContainer.appendChild(itemEl);
+                });
+            }
+
+            // Overweight
+            const overList = [...analyzed].filter(a => a.diffVal < -10).sort((a, b) => a.diffPct - b.diffPct).slice(0, 3);
+            if (overList.length === 0) {
+                overContainer.innerHTML = `<p class="text-xs text-gray-500 py-2">Nenhum ativo excessivamente acima da meta.</p>`;
+            } else {
+                overList.forEach(item => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = "flex items-center justify-between p-2.5 bg-gray-900/60 rounded-xl border border-gray-800 text-xs";
+                    itemEl.innerHTML = `
+                        <div class="flex items-center space-x-2.5">
+                            <span class="font-bold text-amber-400 w-14">${item.ticker}</span>
+                            <span class="text-gray-400">${item.category}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-amber-400 font-semibold">${formatBRL(item.diffVal)}</span>
+                            <div class="text-[10px] text-gray-500">Atual: ${item.actualPct.toFixed(1)}% | Meta: ${item.targetPercent}%</div>
+                        </div>
+                    `;
+                    overContainer.appendChild(itemEl);
+                });
+            }
+        }
+
+        function renderAssetsTable() {
+            const tbody = document.getElementById('assetsTableBody');
+            tbody.innerHTML = '';
+
+            const searchTerm = (document.getElementById('assetSearchInput')?.value || '').toLowerCase();
+            const catFilter = document.getElementById('categoryFilter')?.value || 'ALL';
+
+            const filtered = window.state.assets.filter(a => {
+                const matchSearch = a.ticker.toLowerCase().includes(searchTerm) || a.name.toLowerCase().includes(searchTerm);
+                const matchCat = catFilter === 'ALL' || a.category === catFilter;
+                return matchSearch && matchCat;
+            });
+
+            document.getElementById('assetFilteredCount').textContent = filtered.length;
+
+            const metrics = computePortfolioMetrics();
+
+            filtered.forEach(asset => {
+                const totalCurrent = asset.quantity * asset.currentPrice;
+                const totalInvested = asset.quantity * asset.avgPrice;
+                const profit = totalCurrent - totalInvested;
+                const profitPct = totalInvested > 0 ? (profit / totalInvested) * 100 : 0;
+                const weight = metrics.totalValue > 0 ? (totalCurrent / metrics.totalValue) * 100 : 0;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-800/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-medium">
+                        <div class="font-bold text-white">${asset.ticker}</div>
+                        <div class="text-[10px] text-gray-400">${asset.name}</div>
+                    </td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-0.5 rounded-md text-[10px] bg-gray-800 text-gray-300 border border-gray-700">${asset.category}</span>
+                    </td>
+                    <td class="py-3 px-4 text-right font-medium">${asset.quantity}</td>
+                    <td class="py-3 px-4 text-right text-gray-400">${formatBRL(asset.avgPrice)}</td>
+                    <td class="py-3 px-4 text-right font-medium text-white">${formatBRL(asset.currentPrice)}</td>
+                    <td class="py-3 px-4 text-right font-bold text-white">${formatBRL(totalCurrent)}</td>
+                    <td class="py-3 px-4 text-right font-semibold ${profit >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+                        ${profit >= 0 ? '+' : ''}${formatBRL(profit)}
+                        <div class="text-[10px]">${profitPct >= 0 ? '+' : ''}${profitPct.toFixed(1)}%</div>
+                    </td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="font-bold text-white">${weight.toFixed(1)}%</span>
+                        <div class="text-[10px] text-gray-500">Meta: ${asset.targetPercent}%</div>
+                    </td>
+                    <td class="py-3 px-4 text-center space-x-1">
+                        <button onclick="editAsset('${asset.id}')" class="p-1.5 text-gray-400 hover:text-emerald-400 rounded-lg transition"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteAsset('${asset.id}')" class="p-1.5 text-gray-400 hover:text-rose-400 rounded-lg transition"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderRebalanceTable(metrics) {
+            const tbody = document.getElementById('rebalanceTableBody');
+            tbody.innerHTML = '';
+
+            window.state.assets.forEach(asset => {
+                const actualVal = asset.quantity * asset.currentPrice;
+                const actualPct = metrics.totalValue > 0 ? (actualVal / metrics.totalValue) * 100 : 0;
+                const idealVal = metrics.totalValue * (asset.targetPercent / 100);
+                const diffVal = idealVal - actualVal; // Positive = Need to buy
+
+                let statusBadge = '';
+                if (diffVal > 20) {
+                    statusBadge = `<span class="px-2 py-1 rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold text-[10px]">Comprar +${formatBRL(diffVal)}</span>`;
+                } else if (diffVal < -20) {
+                    statusBadge = `<span class="px-2 py-1 rounded-lg bg-amber-950 text-amber-400 border border-amber-800/60 font-semibold text-[10px]">Aguardar / Acima</span>`;
+                } else {
+                    statusBadge = `<span class="px-2 py-1 rounded-lg bg-gray-800 text-gray-300 border border-gray-700 font-semibold text-[10px]">Balanceado</span>`;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-800/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="font-bold text-white">${asset.ticker}</div>
+                        <div class="text-[10px] text-gray-400">${asset.category}</div>
+                    </td>
+                    <td class="py-3 px-4 text-right font-medium">${formatBRL(actualVal)}</td>
+                    <td class="py-3 px-4 text-center font-bold text-white">${actualPct.toFixed(1)}%</td>
+                    <td class="py-3 px-4 text-center text-emerald-400 font-semibold">${asset.targetPercent}%</td>
+                    <td class="py-3 px-4 text-right text-gray-300">${formatBRL(idealVal)}</td>
+                    <td class="py-3 px-4 text-right font-semibold ${diffVal > 0 ? 'text-emerald-400' : 'text-amber-400'}">
+                        ${diffVal > 0 ? '+' : ''}${formatBRL(diffVal)}
+                    </td>
+                    <td class="py-3 px-4 text-center">${statusBadge}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function calculateSmartAporte() {
+            const aporteValue = parseFloat(document.getElementById('aporteValueInput').value) || 0;
+            const tbody = document.getElementById('aporteResultsTable');
+            tbody.innerHTML = '';
+
+            if (aporteValue <= 0 || window.state.assets.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-500">Informe um valor válido de aporte.</td></tr>`;
+                return;
+            }
+
+            const metrics = computePortfolioMetrics();
+            const newTotalPortfolio = metrics.totalValue + aporteValue;
+
+            // Algorithm: Calculate absolute deficit for each asset based on new portfolio size
+            const gaps = window.state.assets.map(asset => {
+                const currentVal = asset.quantity * asset.currentPrice;
+                const idealValNew = newTotalPortfolio * (asset.targetPercent / 100);
+                const deficit = Math.max(0, idealValNew - currentVal); // Only consider assets needing money
+                return { ...asset, currentVal, idealValNew, deficit };
+            });
+
+            const totalDeficit = gaps.reduce((acc, curr) => acc + curr.deficit, 0);
+
+            if (totalDeficit === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-400">Sua carteira já está perfeitamente balanceada! Você pode distribuir proporcionalmente às metas.</td></tr>`;
+                return;
+            }
+
+            // Distribute aporte proportional to deficit
+            gaps.forEach(item => {
+                const allocatedAporte = (item.deficit / totalDeficit) * aporteValue;
+                const buyQty = Math.floor(allocatedAporte / item.currentPrice);
+                const actualAllocatedVal = buyQty > 0 ? buyQty * item.currentPrice : allocatedAporte;
+                const newTotalAssetVal = item.currentVal + actualAllocatedVal;
+                const newPct = (newTotalAssetVal / newTotalPortfolio) * 100;
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-800/40 transition";
+                tr.innerHTML = `
+                    <td class="py-3 px-3">
+                        <div class="font-bold text-white">${item.ticker}</div>
+                        <div class="text-[10px] text-gray-400">${item.category}</div>
+                    </td>
+                    <td class="py-3 px-3 text-right text-gray-300">${formatBRL(item.currentPrice)}</td>
+                    <td class="py-3 px-3 text-right font-bold text-emerald-400">${formatBRL(actualAllocatedVal)}</td>
+                    <td class="py-3 px-3 text-center">
+                        <span class="px-2 py-1 rounded-md bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold">${buyQty} un</span>
+                    </td>
+                    <td class="py-3 px-3 text-center text-gray-200">${newPct.toFixed(1)}% <span class="text-[10px] text-gray-500">(Meta: ${item.targetPercent}%)</span></td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function handleAssetSubmit(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('assetId').value;
+            const assetData = {
+                id: id || Date.now().toString(),
+                ticker: document.getElementById('formTicker').value.toUpperCase().trim(),
+                name: document.getElementById('formName').value.trim(),
+                category: document.getElementById('formCategory').value,
+                quantity: parseFloat(document.getElementById('formQuantity').value) || 0,
+                avgPrice: parseFloat(document.getElementById('formAvgPrice').value) || 0,
+                currentPrice: parseFloat(document.getElementById('formCurrentPrice').value) || 0,
+                targetPercent: parseFloat(document.getElementById('formTargetPercent').value) || 0
+            };
+
+            if (id) {
+                const index = window.state.assets.findIndex(a => a.id === id);
+                if (index !== -1) window.state.assets[index] = assetData;
+            } else {
+                window.state.assets.push(assetData);
+            }
+
+            saveState();
+            closeModal('assetModal');
+            renderAll();
+            showToast(id ? "Ativo atualizado com sucesso!" : "Novo ativo adicionado!", "success");
+        }
+
+        function editAsset(id) {
+            const asset = window.state.assets.find(a => a.id === id);
+            if (!asset) return;
+
+            document.getElementById('assetId').value = asset.id;
+            document.getElementById('formTicker').value = asset.ticker;
+            document.getElementById('formName').value = asset.name;
+            document.getElementById('formCategory').value = asset.category;
+            document.getElementById('formQuantity').value = asset.quantity;
+            document.getElementById('formAvgPrice').value = asset.avgPrice;
+            document.getElementById('formCurrentPrice').value = asset.currentPrice;
+            document.getElementById('formTargetPercent').value = asset.targetPercent;
+
+            document.getElementById('modalTitle').textContent = "Editar Ativo";
+            openModal('assetModal');
+        }
+
+        function deleteAsset(id) {
+            const asset = window.state.assets.find(a => a.id === id);
+            if (!asset) return;
+
+            // Custom UI confirmation modal alternative / direct deletion toast
+            window.state.assets = window.state.assets.filter(a => a.id !== id);
+            saveState();
+            renderAll();
+            showToast(`Ativo ${asset.ticker} excluído!`, "info");
+        }
+
+        function filterAssetsTable() {
+            renderAssetsTable();
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-view').forEach(v => v.classList.add('hidden'));
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+
+            // Reset tab styles
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('text-emerald-400', 'border-emerald-400');
+                btn.classList.add('text-gray-400', 'border-transparent');
+            });
+
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            if (activeBtn) {
+                activeBtn.classList.remove('text-gray-400', 'border-transparent');
+                activeBtn.classList.add('text-emerald-400', 'border-emerald-400');
+            }
+
+            // Mobile nav highlight
+            document.querySelectorAll('nav button').forEach(b => b.classList.replace('text-emerald-400', 'text-gray-400'));
+            const mobActive = document.getElementById(`mob-tab-${tabId}`);
+            if (mobActive) mobActive.classList.replace('text-gray-400', 'text-emerald-400');
+
+            if (tabId === 'aporte') {
+                calculateSmartAporte();
+            }
+        }
+
+        // Modal Handlers
+        function openModal(modalId) {
+            if (modalId === 'assetModal' && !document.getElementById('assetId').value) {
+                document.getElementById('assetForm').reset();
+                document.getElementById('assetId').value = '';
+                document.getElementById('modalTitle').textContent = "Adicionar Novo Ativo";
+            }
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function openCloudModal() {
+            updateCloudStatusUI();
+            openModal('cloudModal');
+        }
+
+        function updateCloudStatusUI() {
+            const room = window.state.cloudRoom;
+            const badge = document.getElementById('cloudStatusBadge');
+            const modeLabel = document.getElementById('modalModeLabel');
+            const codeContainer = document.getElementById('modalCodeContainer');
+            const codeSpan = document.getElementById('currentCloudCode');
+
+            if (room) {
+                badge.innerHTML = `<i class="fa-solid fa-cloud text-indigo-400"></i> Nuvem: ${room}`;
+                badge.className = "text-[10px] bg-indigo-950/80 text-indigo-300 px-2 py-0.5 rounded-full border border-indigo-700/60 font-bold flex items-center gap-1";
+                
+                modeLabel.textContent = "Conectado na Nuvem";
+                modeLabel.className = "font-bold text-indigo-400";
+                codeContainer.classList.remove('hidden');
+                codeSpan.textContent = room;
+            } else {
+                badge.innerHTML = `<i class="fa-solid fa-hard-drive text-amber-400"></i> Local`;
+                badge.className = "text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full border border-gray-700 font-medium flex items-center gap-1";
+
+                modeLabel.textContent = "Modo Off-line / Local";
+                modeLabel.className = "font-bold text-amber-400";
+                codeContainer.classList.add('hidden');
+            }
+        }
+
+        function connectToCloudRoom() {
+            const input = document.getElementById('cloudRoomInput');
+            const val = input.value.trim();
+            if (!val) {
+                showToast("Digite um código válido para a carteira.", "error");
+                return;
+            }
+            if (window.cloudSync) {
+                window.cloudSync.connectRoom(val);
+                closeModal('cloudModal');
+            }
+        }
+
+        function generateRandomRoom() {
+            const randomCode = 'CARTEIRA-' + Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('cloudRoomInput').value = randomCode;
+        }
+
+        function copyCloudCode() {
+            const code = window.state.cloudRoom || document.getElementById('cloudRoomInput').value.trim();
+            if (!code) {
+                showToast("Nenhum código para copiar.", "error");
+                return;
+            }
+            
+            // Clipboard fallback
+            const tempInput = document.createElement("input");
+            tempInput.value = code;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand("copy");
+            document.body.removeChild(tempInput);
+
+            showToast(`Código ${code} copiado para a área de transferência!`, "success");
+        }
+
+        function switchToLocalMode() {
+            if (window.cloudSync) {
+                window.cloudSync.disconnectRoom();
+                closeModal('cloudModal');
+            }
+        }
+
+        function exportImportData() {
+            openModal('dataModal');
+        }
+
+        function downloadBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(window.state, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `quantfolio_backup_${new Date().toISOString().slice(0,10)}.json`);
+            dlAnchorElem.click();
+            showToast("Backup baixado com sucesso!", "success");
+        }
+
+        function uploadBackup() {
+            const fileInput = document.getElementById('importFileInput');
+            if (!fileInput.files.length) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedState = JSON.parse(e.target.result);
+                    if (importedState && Array.isArray(importedState.assets)) {
+                        window.state = importedState;
+                        saveState();
+                        renderAll();
+                        closeModal('dataModal');
+                        showToast("Dados do backup importados!", "success");
+                    }
+                } catch(err) {
+                    showToast("Arquivo JSON inválido.", "error");
+                }
+            };
+            reader.readAsText(fileInput.files[0]);
+        }
+
+        function resetToDefaultData() {
+            window.state = { profile: 'moderado', assets: INITIAL_ASSETS, cloudRoom: window.state.cloudRoom };
+            saveState();
+            renderAll();
+            closeModal('dataModal');
+            showToast("Dados demonstrativos restaurados!", "info");
+        }
+
+        // Formatting & Toast Helper
+        function formatBRL(val) {
+            return (val || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const toast = document.createElement('div');
+            const colors = {
+                success: "bg-emerald-900/90 border-emerald-500 text-emerald-200",
+                error: "bg-rose-900/90 border-rose-500 text-rose-200",
+                info: "bg-gray-900/90 border-indigo-500 text-indigo-200"
+            };
+
+            const icons = {
+                success: "fa-circle-check text-emerald-400",
+                error: "fa-circle-xmark text-rose-400",
+                info: "fa-circle-info text-indigo-400"
+            };
+
+            toast.className = `flex items-center space-x-2 px-4 py-3 rounded-xl border backdrop-blur-md shadow-xl text-xs font-semibold ${colors[type] || colors.info} toast-enter pointer-events-auto`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type] || icons.info} text-sm"></i>
+                <span>${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('toast-show'), 10);
+
+            setTimeout(() => {
+                toast.classList.remove('toast-show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        window.showToast = showToast;
+    </script>
+</body>
+</html>
